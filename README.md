@@ -1,5 +1,7 @@
 # Custom i3blocks bandwidth block
 
+![demo](.demo.gif)
+
 A customizable bandwidth monitor for i3blocks written in Zig.
 
 ## Features
