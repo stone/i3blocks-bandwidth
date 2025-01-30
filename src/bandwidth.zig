@@ -1,7 +1,5 @@
 const std = @import("std");
 const fs = std.fs;
-const heap = std.heap;
-const process = std.process;
 const time = std.time;
 const clap = @import("clap");
 const netdev = @import("netdev.zig");
@@ -27,7 +25,6 @@ const Config = struct {
     critical_tx: u64 = 0,
     critical_color: []const u8 = RED,
     use_si: bool = false,
-    label: []const u8 = "",
     allocator: std.mem.Allocator = undefined,
 
     pub fn deinit(self: *Config) void {
@@ -70,32 +67,20 @@ fn display(
     } else {
         try writer.print("{d:.1}G{c}/s", .{ value / @as(f64, @floatFromInt(divisor * divisor * divisor)), unit });
     }
-
-    try writer.writeAll("</span>");
+    try writer.print("</span>", .{});
 }
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
+    //defer _ = gpa.deinit();
+    defer if (gpa.deinit() == .leak) {
+        @panic("Memory leak has occurred!");
+    };
     const allocator = gpa.allocator();
 
     const stdout = std.io.getStdOut();
     var config = Config{ .allocator = allocator };
     defer config.deinit();
-
-    // Parse environment variables
-    var env_map = try process.getEnvMap(allocator);
-    defer env_map.deinit();
-
-    if (env_map.get("USE_BITS")) |val| {
-        if (val.len > 0 and val[0] == '1') config.unit = 'b';
-    }
-    if (env_map.get("USE_BYTES")) |val| {
-        if (val.len > 0 and val[0] == '1') config.unit = 'B';
-    }
-    if (env_map.get("USE_SI")) |val| {
-        if (val.len > 0 and val[0] == '1') config.use_si = true;
-    }
 
     // Parse command line arguments and override environment variables
     // Compile-time parsing of command line arguments, very nice!
@@ -138,7 +123,12 @@ pub fn main() !void {
         var it = std.mem.split(u8, ifaces, ",");
         var interfaces = std.ArrayList([]const u8).init(allocator);
         defer interfaces.deinit();
-
+        defer {
+            // Free each duplicated string
+            for (interfaces.items) |item| {
+                allocator.free(item);
+            }
+        }
         while (it.next()) |iface| {
             try interfaces.append(try allocator.dupe(u8, std.mem.trim(u8, iface, " ")));
         }
@@ -172,6 +162,10 @@ pub fn main() !void {
     var prev_time = std.time.timestamp();
     var prev_stats = try netdev.getValues(config.interfaces);
 
+    // Create a buffered writer, that we can flush when needed.
+    var buffered_writer = std.io.bufferedWriter(stdout.writer());
+    const buffered_stdout = buffered_writer.writer();
+
     while (true) {
         std.time.sleep(@as(u64, config.refresh_time) * std.time.ns_per_s);
 
@@ -184,12 +178,11 @@ pub fn main() !void {
         const rx = @as(f64, @floatFromInt(current_stats[0] - prev_stats[0])) / time_diff;
         const tx = @as(f64, @floatFromInt(current_stats[1] - prev_stats[1])) / time_diff;
 
-        try stdout.writer().print("{s}", .{config.label});
-        try display(stdout.writer(), config.unit, divisor, rx, config.warning_rx, config.critical_rx, config.warning_color, config.critical_color);
-        try stdout.writer().writeAll(" ");
-        try display(stdout.writer(), config.unit, divisor, tx, config.warning_tx, config.critical_tx, config.warning_color, config.critical_color);
-        try stdout.writer().writeAll("\n");
-        try stdout.flush();
+        try display(buffered_stdout, config.unit, divisor, rx, config.warning_rx, config.critical_rx, config.warning_color, config.critical_color);
+        try buffered_stdout.print(" ", .{});
+        try display(buffered_stdout, config.unit, divisor, tx, config.warning_tx, config.critical_tx, config.warning_color, config.critical_color);
+        try buffered_stdout.print("\n", .{});
+        try buffered_writer.flush();
 
         prev_time = current_time;
         prev_stats = current_stats;
