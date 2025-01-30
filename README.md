@@ -63,26 +63,45 @@ Add to your i3blocks configuration:
 ```ini
 [bandwidth]
 command=$SCRIPT_DIR/bandwidth
-interval=1
+interval=persist
 markup=pango
+label=
+min_width=20000.0 B/s 20000.0 B/s
+color=#000
 ```
 
-## Usage
+## Flags
 
 ```
-USAGE: bandwidth [OPTIONS]
+    -b, --bits
+            use bits/s
 
-OPTIONS:
-    -b, --bits            use bits/s
-    -B, --bytes           use Bytes/s (default)
-    -t, --seconds <usize> refresh time (default is 1)
-    -i, --interfaces      interfaces to monitor, comma separated (default all except lo)
-    -w, --warning         set warning (default orange) for Rx:Tx bandwidth
-    -W, --warningcolor    set warning color (#RRGGBB)
-    -c, --critical        set critical (default red) for Rx:Tx bandwidth
-    -C, --criticalcolor   set critical color (#RRGGBB)
-    -s, --si             use SI units
-    -h, --help           print this help message
+    -B, --bytes
+            use bytes/s (default)
+
+    -t, --seconds <usize>
+            refresh time (default is 1)
+
+    -i, --interfaces <string>
+            interfaces to monitor, comma separated (default all except lo)
+
+    -w, --warning <string>
+            set warning (default orange) for Rx:Tx bandwidth
+
+    -W, --warningcolor <string>
+            set warning color (#RRGGBB)
+
+    -c, --critical <string>
+            set critical (default red) for Rx:Tx bandwidth
+
+    -C, --criticalcolor <string>
+            set critical color (#RRGGBB)
+
+    -s, --si
+            use SI units (default is IEC)
+
+    -h, --help
+            print this help message
 ```
 
 ## Example Output
